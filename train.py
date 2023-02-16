@@ -7,7 +7,6 @@ from torchvision import transforms
 from my_dataset import MyDataSet
 from model import swin_tiny_patch4_window7_224 as create_model
 # from model_resnet import resnet34 as create_model
-# from model_vgg import vgg as create_model
 from utils import read_split_data, train_one_epoch, evaluate
 import os
 import warnings
@@ -34,14 +33,12 @@ def main(args):
         "val": transforms.Compose([transforms.Resize(img_size),
                                    transforms.ToTensor(),
                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])}
-#
 
-    # 实例化训练数据集
     train_dataset = MyDataSet(images_path=train_images_path,
                               images_class=train_images_label,
                               transform=data_transform["train"])
 
-    # 实例化验证数据集
+    
     val_dataset = MyDataSet(images_path=val_images_path,
                             images_class=val_images_label,
                             transform=data_transform["val"])
@@ -65,28 +62,27 @@ def main(args):
 
     model = create_model(num_classes=args.num_classes).to(device)
 
-    # if args.weights != "":
-    #     assert os.path.exists(args.weights), "weights_2023 file: '{}' not exist.".format(args.weights)
-    #     weights_dict = torch.load(args.weights, map_location=device)["model"]
-    #     # 删除有关分类类别的权重
-    #     for k in list(weights_dict.keys()):
-    #         if "head" in k:
-    #             del weights_dict[k]
-    #     print(model.load_state_dict(weights_dict, strict=False))
-    #
-    # if args.freeze_layers:
-    #     for name, para in model.named_parameters():
-    #         # 除head外，其他权重全部冻结
-    #         if "head" not in name:
-    #             para.requires_grad_(False)
-    #         else:
-    #             print("training {}".format(name))
+    if args.weights != "":
+        assert os.path.exists(args.weights), "weights_2023 file: '{}' not exist.".format(args.weights)
+        weights_dict = torch.load(args.weights, map_location=device)["model"]
+        # 删除有关分类类别的权重
+        for k in list(weights_dict.keys()):
+            if "head" in k:
+                del weights_dict[k]
+        print(model.load_state_dict(weights_dict, strict=False))
+    
+    if args.freeze_layers:
+        for name, para in model.named_parameters():
+            # 除head外，其他权重全部冻结
+            if "head" not in name:
+                para.requires_grad_(False)
+            else:
+                print("training {}".format(name))
 
     pg = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(pg, lr=args.lr, weight_decay=5E-2)
-    # optimizer = optim.Adadelta(pg, lr=args.lr, rho=0.9,eps=1e-06,weight_decay=5E-2)
 
-    logger = get_logger(r"F:\wt\swin_transformer\resnet\logs\new\3.log")    # 改log，改weight/txt, 改weight/pth
+    logger = get_logger("")   
     logger.info('start training!')
 
     start = time.time()
@@ -99,14 +95,7 @@ def main(args):
                                                 device=device,
                                                 epoch=epoch)
 
-
-        # validate
-        # 假设 0 为正样本
-        # with open("./weights_1/epoch_{}_pos_0_prob.txt".format(epoch), "w") as f:
-        #     f.write("{}\t{}\n".format("prob", "label"))
-
-        # 假设 1 为正样本
-        with open("./resnet/weights_new_3/epoch_{}_pos_1_prob.txt".format(epoch), "w") as f:
+        with open("./epoch_{}_pos_1_prob.txt".format(epoch), "w") as f:
             f.write("{}\t{}\n".format("prob", "label"))
 
 
@@ -124,8 +113,8 @@ def main(args):
         tb_writer.add_scalar(tags[3], val_acc, epoch)
         tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
 
-        if not os.path.exists('./resnet/weights_new_3/'):
-            os.mkdir('./resnet/weights_new_3/')
+        if not os.path.exists('./weights/'):
+            os.mkdir('./weights/')
         torch.save(model.state_dict(), "./resnet/weights_new_3/model-{}.pth".format(epoch))
 
         logger.info('Epoch:[{}/{}]\t train_loss={:.3f}\t train_acc={:.3f}'.format(epoch+1, args.epochs, train_loss, train_acc))
@@ -139,35 +128,14 @@ if __name__ == '__main__':
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--batch-size', type=int, default=24)
-    parser.add_argument('--lr', type=float, default=0.00001)
-
-    # 数据集所在根目录
-    # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\100\1_youwu")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\100\2_youyou")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\100\3_wuwu")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\100\4_wuyou")
+    parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--data-path', type=str,
-                        default=r"F:\wt\swin_transformer\test_data")
-#40
-
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\40\1_40youwu")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\40\2_40youyou")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\40\3_40wuwu")
-    # parser.add_argument('--data-path', type=str,
-    #                     default=r"F:\wt\swin_transformer\data\40\4_40wuyou")
+                        default=r"")
 
 
     # 预训练权重路径，如果不想载入就设置为空字符
-    parser.add_argument('--weights', type=str, default='model-9.pth',
-                        help='initial weights path')#swin_tiny_patch4_window7_224.pth,resnet34-pre.pth,vgg16.pth
+    parser.add_argument('--weights', type=str, default='',
+                        help='initial weights path')
     # 是否冻结权重
     parser.add_argument('--freeze-layers', type=bool, default=False)
     parser.add_argument('--device', default='cuda:0', help='device id (i.e. 0 or 0,1 or cpu)')
